@@ -25,6 +25,5 @@ insights = st.Page(
   title="Insights",
 )
 
-# Add other pages to navigation
 pg = st.navigation([overview, data_exploration, prediction_model, insights])
 pg.run()
