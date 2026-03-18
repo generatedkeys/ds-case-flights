@@ -1,28 +1,28 @@
 import streamlit as st
 
 st.set_page_config(
-  page_title="Data Science - Flight Delay Prediction",
+  page_title="Data Science - Vluchtvertraging Voorspelling",
   layout="wide",
 )
 
 overview = st.Page(
   "pages/overview.py",
-  title="Overview",
+  title="Overzicht",
 )
 
 data_exploration = st.Page(
   "pages/eda.py",
-  title="Exploratory Data Analysis",
+  title="Exploratieve Data Analyse",
 )
 
 prediction_model = st.Page(
   "pages/prediction_model.py",
-  title="Prediction Model",
+  title="Voorspellingsmodel",
 )
 
 insights = st.Page(
   "pages/insights.py",
-  title="Insights",
+  title="Inzichten",
 )
 
 pg = st.navigation([overview, data_exploration, prediction_model, insights])

@@ -15,11 +15,11 @@ from src.config import (
 )
 from src.predict import load_metrics, load_model, predict
 
-st.header("Prediction Model")
-st.caption("Input flight details to predict delays.")
+st.header("Voorspellingsmodel")
+st.caption("Voer vluchtgegevens in om vertragingen te voorspellen.")
 
 if not MODEL_PATH.exists():
-    st.warning("No trained model found. Run `python -m src.train` first.")
+    st.warning("Geen getraind model gevonden. Voer eerst `python -m src.train` uit.")
     st.stop()
 
 
@@ -64,7 +64,7 @@ uniques = _load_unique_values()
 
 # -- Metrics ------------------------------------------------------------------
 
-st.subheader("Model performance (test set)")
+st.subheader("Modelprestaties (testset)")
 
 overall = metrics["overall"]
 c1, c2, c3 = st.columns(3)
@@ -73,47 +73,47 @@ c2.metric("RMSE (min)", f"{overall['rmse']:.1f}")
 c3.metric("R²", f"{overall['r2']:.3f}")
 
 if "by_lsv" in metrics:
-    st.markdown("**By movement type**")
-    label_map = {"L": "Arrivals", "S": "Departures"}
+    st.markdown("**Per bewegingstype**")
+    label_map = {"L": "Aankomsten", "S": "Vertrekken"}
     lsv_cols = st.columns(len(metrics["by_lsv"]))
     for col, (group, m) in zip(lsv_cols, metrics["by_lsv"].items()):
         col.metric(f"{label_map.get(group, group)} MAE", f"{m['mae']:.1f} min")
 
 # -- Single-flight prediction -------------------------------------------------
 
-st.subheader("Predict delay for a single flight")
+st.subheader("Voorspel vertraging voor een enkele vlucht")
 
 with st.form("predict_form"):
     r1c1, r1c2 = st.columns(2)
     lsv = r1c1.selectbox(
-        "Arrival / Departure",
+        "Aankomst / Vertrek",
         uniques[COL_LSV],
-        format_func=lambda x: "Arrival" if x == "L" else "Departure",
+        format_func=lambda x: "Aankomst" if x == "L" else "Vertrek",
     )
-    terminal = r1c2.selectbox("Terminal / Area", uniques[COL_TERMINAL])
+    terminal = r1c2.selectbox("Terminal / Gebied", uniques[COL_TERMINAL])
 
     r2c1, r2c2 = st.columns(2)
-    aircraft = r2c1.selectbox("Aircraft type", uniques[COL_AIRCRAFT])
+    aircraft = r2c1.selectbox("Vliegtuigtype", uniques[COL_AIRCRAFT])
     gate_zone = r2c2.selectbox("Gate zone", uniques["gate_zone"])
 
     r3c1, r3c2 = st.columns(2)
-    runway = r3c1.selectbox("Runway", uniques[COL_RUNWAY])
-    rw_config = r3c2.selectbox("Runway config", uniques[COL_RUNWAY_CONFIG])
+    runway = r3c1.selectbox("Start/Landingsbaan", uniques[COL_RUNWAY])
+    rw_config = r3c2.selectbox("Baanconfiguratie", uniques[COL_RUNWAY_CONFIG])
 
     r4c1, r4c2 = st.columns(2)
     org_des = r4c1.selectbox(
-        "Origin / Destination (ICAO)", uniques[COL_ORG_DES]
+        "Oorsprong / Bestemming (ICAO)", uniques[COL_ORG_DES]
     )
-    carrier = r4c2.selectbox("Carrier", uniques["carrier"])
+    carrier = r4c2.selectbox("Luchtvaartmaatschappij", uniques["carrier"])
 
     r5c1, r5c2 = st.columns(2)
     sched_time = r5c1.time_input(
-        "Scheduled time", value=pd.Timestamp("08:00").time()
+        "Geplande tijd", value=pd.Timestamp("08:00").time()
     )
-    sched_date = r5c2.date_input("Scheduled date")
+    sched_date = r5c2.date_input("Geplande datum")
 
-    congestion = st.slider("Est. movements in ±30 min", 0, 80, 20)
-    submitted = st.form_submit_button("Predict")
+    congestion = st.slider("Geschatte bewegingen in ±30 min", 0, 80, 20)
+    submitted = st.form_submit_button("Voorspellen")
 
 if submitted:
     dow = pd.Timestamp(sched_date).dayofweek
@@ -141,4 +141,4 @@ if submitted:
         ]
     )
     pred = predict(model, row)[0]
-    st.success(f"Predicted delay: **{pred:.1f} minutes**")
+    st.success(f"Voorspelde vertraging: **{pred:.1f} minuten**")
