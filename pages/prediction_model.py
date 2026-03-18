@@ -1,4 +1,144 @@
 import streamlit as st
+import pandas as pd
+
+from src.config import (
+    COL_FLIGHT,
+    COL_GATE,
+    COL_RUNWAY,
+    MODEL_PATH,
+    RAW_CSV,
+    COL_LSV,
+    COL_TERMINAL,
+    COL_AIRCRAFT,
+    COL_RUNWAY_CONFIG,
+    COL_ORG_DES,
+)
+from src.predict import load_metrics, load_model, predict
 
 st.header("Prediction Model")
 st.caption("Input flight details to predict delays.")
+
+if not MODEL_PATH.exists():
+    st.warning("No trained model found. Run `python -m src.train` first.")
+    st.stop()
+
+
+@st.cache_resource
+def _load_model():
+    return load_model()
+
+
+@st.cache_data
+def _load_metrics():
+    return load_metrics()
+
+
+@st.cache_data
+def _load_unique_values():
+    df = pd.read_csv(RAW_CSV, on_bad_lines="skip")
+    return {
+        COL_LSV: sorted(df[COL_LSV].dropna().unique()),
+        COL_TERMINAL: sorted(df[COL_TERMINAL].dropna().unique()),
+        "gate_zone": sorted(
+            df[COL_GATE]
+            .str.extract(r"^([A-Z])", expand=False)
+            .dropna()
+            .unique()
+        ),
+        COL_AIRCRAFT: sorted(df[COL_AIRCRAFT].dropna().unique()),
+        COL_RUNWAY: sorted(df[COL_RUNWAY].dropna().unique()),
+        COL_RUNWAY_CONFIG: sorted(df[COL_RUNWAY_CONFIG].dropna().unique()),
+        COL_ORG_DES: sorted(df[COL_ORG_DES].dropna().unique()),
+        "carrier": sorted(
+            df[COL_FLIGHT]
+            .str.extract(r"^([A-Z]{2,3})", expand=False)
+            .dropna()
+            .unique()
+        ),
+    }
+
+
+model = _load_model()
+metrics = _load_metrics()
+uniques = _load_unique_values()
+
+# -- Metrics ------------------------------------------------------------------
+
+st.subheader("Model performance (test set)")
+
+overall = metrics["overall"]
+c1, c2, c3 = st.columns(3)
+c1.metric("MAE (min)", f"{overall['mae']:.1f}")
+c2.metric("RMSE (min)", f"{overall['rmse']:.1f}")
+c3.metric("R²", f"{overall['r2']:.3f}")
+
+if "by_lsv" in metrics:
+    st.markdown("**By movement type**")
+    label_map = {"L": "Arrivals", "S": "Departures"}
+    lsv_cols = st.columns(len(metrics["by_lsv"]))
+    for col, (group, m) in zip(lsv_cols, metrics["by_lsv"].items()):
+        col.metric(f"{label_map.get(group, group)} MAE", f"{m['mae']:.1f} min")
+
+# -- Single-flight prediction -------------------------------------------------
+
+st.subheader("Predict delay for a single flight")
+
+with st.form("predict_form"):
+    r1c1, r1c2 = st.columns(2)
+    lsv = r1c1.selectbox(
+        "Arrival / Departure",
+        uniques[COL_LSV],
+        format_func=lambda x: "Arrival" if x == "L" else "Departure",
+    )
+    terminal = r1c2.selectbox("Terminal / Area", uniques[COL_TERMINAL])
+
+    r2c1, r2c2 = st.columns(2)
+    aircraft = r2c1.selectbox("Aircraft type", uniques[COL_AIRCRAFT])
+    gate_zone = r2c2.selectbox("Gate zone", uniques["gate_zone"])
+
+    r3c1, r3c2 = st.columns(2)
+    runway = r3c1.selectbox("Runway", uniques[COL_RUNWAY])
+    rw_config = r3c2.selectbox("Runway config", uniques[COL_RUNWAY_CONFIG])
+
+    r4c1, r4c2 = st.columns(2)
+    org_des = r4c1.selectbox(
+        "Origin / Destination (ICAO)", uniques[COL_ORG_DES]
+    )
+    carrier = r4c2.selectbox("Carrier", uniques["carrier"])
+
+    r5c1, r5c2 = st.columns(2)
+    sched_time = r5c1.time_input(
+        "Scheduled time", value=pd.Timestamp("08:00").time()
+    )
+    sched_date = r5c2.date_input("Scheduled date")
+
+    congestion = st.slider("Est. movements in ±30 min", 0, 80, 20)
+    submitted = st.form_submit_button("Predict")
+
+if submitted:
+    dow = pd.Timestamp(sched_date).dayofweek
+    row = pd.DataFrame(
+        [
+            {
+                COL_LSV: lsv,
+                COL_TERMINAL: terminal,
+                "gate_zone": gate_zone,
+                COL_AIRCRAFT: aircraft,
+                COL_RUNWAY: runway,
+                COL_RUNWAY_CONFIG: rw_config,
+                COL_ORG_DES: org_des,
+                "carrier": carrier,
+                "hour": sched_time.hour,
+                "minute": sched_time.minute,
+                "day_of_week": dow,
+                "month": sched_date.month,
+                "is_weekend": int(dow >= 5),
+                "moves_30m": congestion,
+                "moves_60m": int(congestion * 1.8),
+                "arr_30m": congestion // 2,
+                "dep_30m": congestion - congestion // 2,
+            }
+        ]
+    )
+    pred = predict(model, row)[0]
+    st.success(f"Predicted delay: **{pred:.1f} minutes**")
