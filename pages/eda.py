@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 
 st.title("Exploratory Data Analysis")
-st.write("Verken de vluchtgegevens en bekijk vertragingstrends door de tijd heen.")
+st.write("Verkenning vluchten schema dataset vertragingen.")
 
 DATA_DIR = Path("data")
 MONTH_LABELS = {
@@ -17,12 +18,10 @@ MONTH_LABELS = {
 def load_data():
     return pd.read_csv(DATA_DIR / "schedule_airport.csv")
 
-
 @st.cache_data
 def load_airports():
     airports = pd.read_csv(DATA_DIR / "airports-extended-clean.csv", sep=";")
     return airports[["IATA", "Name"]].dropna().drop_duplicates(subset=["IATA"])
-
 
 def build_delay_features(frame: pd.DataFrame) -> pd.DataFrame:
     scheduled_ts = pd.to_datetime(
@@ -45,21 +44,6 @@ def build_delay_features(frame: pd.DataFrame) -> pd.DataFrame:
         month=flight_date.dt.month,
         year_month=flight_date.dt.to_period("M").dt.to_timestamp(),
     )
-
-
-def prepare_top_airports(frame: pd.DataFrame, airports: pd.DataFrame) -> pd.DataFrame:
-    return (
-        frame["Org/Des"]
-        .value_counts()
-        .head(5)
-        .rename_axis("Airport Code")
-        .reset_index(name="Number of Flights")
-        .merge(airports, left_on="Airport Code", right_on="IATA", how="left")
-        .assign(Airport=lambda df: df["Name"].fillna(df["Airport Code"]))
-        [["Airport", "Number of Flights"]]
-        .set_index("Airport")
-    )
-
 
 def prepare_monthly_delay_views(
     frame: pd.DataFrame,
@@ -91,7 +75,7 @@ eda_data = build_delay_features(data)
 
 # Display the data
 st.subheader("Overzicht van de dataset")
-st.dataframe(data)
+st.dataframe(data.head())
 
 # Basic EDA
 st.subheader("Basisstatistieken")
@@ -100,26 +84,20 @@ st.write(data.describe(include="all"))
 st.subheader("Ontbrekende waarden")
 st.write(data.isnull().sum())
 
-# Top five airports by number of flights
-st.subheader("Top 5 luchthavens op aantal vluchten")
-st.bar_chart(prepare_top_airports(data, airports))
-
-st.subheader("Vertraging per maand over twee jaar")
-delay_data, monthly_delay, monthly_pattern, delayed_share = prepare_monthly_delay_views(eda_data)
-
-if delay_data.empty:
-    st.warning("De vertraging kon niet worden berekend op basis van de beschikbare geplande en werkelijke tijden.")
-else:
-    st.caption("Deze tabel helpt om seizoenspatronen per maand tussen jaren te vergelijken.")
-    st.dataframe(monthly_pattern.style.format("{:.1f}"))
-    st.caption("Aandeel vluchten met meer dan 0 minuten vertraging per maand.")
-    st.line_chart(delayed_share.set_index("year_month")["share_delayed"])
+# Flight counts per month
+st.subheader("Aantal geplande vluchten per maand")
+flights_per_month = (
+    eda_data.dropna(subset=["year_month"])
+    .groupby("year_month", as_index=False)
+    .size()
+    .rename(columns={"size": "flights"})
+    .sort_values("year_month")
+)
+st.bar_chart(flights_per_month.set_index("year_month")["flights"])
 
 # ---------------------------------------------------------------------------
-# Feature-engineering-driven EDA graphs
+# EDA graphs
 # ---------------------------------------------------------------------------
-import plotly.express as px
-
 st.header("Feature Engineering Verkenning")
 
 fe_data = build_delay_features(data).copy()
@@ -135,8 +113,8 @@ fe_data = fe_data.dropna(subset=["delay_minutes"])
 
 DAY_NAMES = {0: "Ma", 1: "Di", 2: "Wo", 3: "Do", 4: "Vr", 5: "Za", 6: "Zo"}
 
-# --- 1. Delay distribution (histogram) ---
-st.subheader("1. Verdeling van vertraging (minuten)")
+# --- Delay distribution ---
+st.subheader("Verdeling van vertraging (minuten)")
 st.caption("Laat de scheefheid zien → motiveert log-transformatie en delay-cap.")
 fig1 = px.histogram(
     fe_data, x="delay_minutes", nbins=80,
@@ -145,18 +123,8 @@ fig1 = px.histogram(
 fig1.update_layout(bargap=0.05)
 st.plotly_chart(fig1, use_container_width=True)
 
-# --- 2. Average delay by hour of day ---
-st.subheader("2. Gemiddelde vertraging per uur van de dag")
-st.caption("Toont of het uur van de dag een sterk signaal is voor het model.")
-hourly = fe_data.groupby("hour", as_index=False)["delay_minutes"].mean()
-fig2 = px.bar(
-    hourly, x="hour", y="delay_minutes",
-    labels={"hour": "Uur", "delay_minutes": "Gem. vertraging (min)"},
-)
-st.plotly_chart(fig2, use_container_width=True)
-
-# --- 3. Delay by day of week ---
-st.subheader("3. Vertraging per dag van de week")
+# --- Delay by day of week ---
+st.subheader("Vertraging per dag van de week")
 st.caption("Vergelijkt weekdagen vs. weekend — relevant voor de is_weekend feature.")
 daily = fe_data.groupby("day_of_week", as_index=False)["delay_minutes"].mean()
 daily["day_name"] = daily["day_of_week"].map(DAY_NAMES)
@@ -166,8 +134,8 @@ fig3 = px.bar(
 )
 st.plotly_chart(fig3, use_container_width=True)
 
-# --- 4. Landing vs Departure (LSV) ---
-st.subheader("4. Vertraging: Landing (L) vs. Vertrek (S)")
+# --- Delay landing vs Departure (LSV)  ---
+st.subheader("Vertraging: Landing (L) vs. Vertrek (S)")
 st.caption("Valideert LSV als categorische feature in het model.")
 fig4 = px.box(
     fe_data, x="LSV", y="delay_minutes",
@@ -176,8 +144,8 @@ fig4 = px.box(
 fig4.update_layout(yaxis=dict(range=[-30, 60]))
 st.plotly_chart(fig4, use_container_width=True)
 
-# --- 5. Delay by top 10 carriers ---
-st.subheader("5. Gemiddelde vertraging per luchtvaartmaatschappij (top 10)")
+# --- Delay by carriers (top 10) ---
+st.subheader("Gemiddelde vertraging per luchtvaartmaatschappij (top 10)")
 st.caption("Valideert de geëxtraheerde carrier-feature uit het vluchtnummer.")
 top_carriers = fe_data["carrier"].value_counts().head(10).index
 carrier_delay = (
@@ -194,8 +162,8 @@ fig5 = px.bar(
 fig5.update_traces(textposition="outside")
 st.plotly_chart(fig5, use_container_width=True)
 
-# --- 6. Delay by aircraft type (top 10) ---
-st.subheader("6. Gemiddelde vertraging per vliegtuigtype (top 10)")
+# --- Delay by aircraft type (top 10) ---
+st.subheader("Gemiddelde vertraging per vliegtuigtype (top 10)")
 st.caption("Valideert ACT als categorische feature — sommige types zijn systematisch later.")
 top_act = fe_data["ACT"].value_counts().head(10).index
 act_delay = (
