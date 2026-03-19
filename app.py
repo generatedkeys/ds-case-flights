@@ -1,29 +1,17 @@
 import streamlit as st
 
 st.set_page_config(
-  page_title="Data Science - Flight Delay Prediction",
-  layout="wide",
+    page_title="ZRH Vluchtvertraging Dashboard",
+    layout="wide",
 )
 
-overview = st.Page(
-  "pages/overview.py",
-  title="Overview",
+pg = st.navigation(
+    [
+        st.Page("pages/overview.py", title="Overzicht"),
+        st.Page("pages/eda.py", title="Data-analyse"),
+        st.Page("pages/day_simulation.py", title="Dagsimulatie"),
+        st.Page("pages/prediction_model.py", title="Modelvergelijking"),
+        st.Page("pages/simulator.py", title="Simulator"),
+    ]
 )
-
-data_exploration = st.Page(
-  "pages/eda.py",
-  title="Exploratory Data Analysis",
-)
-
-prediction_model = st.Page(
-  "pages/prediction_model.py",
-  title="Prediction Model",
-)
-
-insights = st.Page(
-  "pages/insights.py",
-  title="Insights",
-)
-
-pg = st.navigation([overview, data_exploration, prediction_model, insights])
 pg.run()

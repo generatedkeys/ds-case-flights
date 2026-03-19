@@ -1,0 +1,11 @@
+{
+  "overall": {
+    "AUC": 0.675,
+    "Accuracy": 0.8057,
+    "Precision": 0.5415,
+    "Recall": 0.1074,
+    "F1": 0.1792
+  },
+  "model_type": "gbr",
+  "threshold_min": 15
+}

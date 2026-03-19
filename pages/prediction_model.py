@@ -1,144 +1,95 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
 
-from src.config import (
-    COL_FLIGHT,
-    COL_GATE,
-    COL_RUNWAY,
-    MODEL_PATH,
-    RAW_CSV,
-    COL_LSV,
-    COL_TERMINAL,
-    COL_AIRCRAFT,
-    COL_RUNWAY_CONFIG,
-    COL_ORG_DES,
+from src.config import MODEL_COMPARISON_PATH
+from src.predict import (
+    load_model_comparison,
+    load_best_model,
+    load_feature_meta,
 )
-from src.predict import load_metrics, load_model, predict
 
-st.header("Prediction Model")
-st.caption("Input flight details to predict delays.")
+st.title("Modelvergelijking")
 
-if not MODEL_PATH.exists():
-    st.warning("No trained model found. Run `python -m src.train` first.")
+if not MODEL_COMPARISON_PATH.exists():
+    st.warning("Geen modelresultaten gevonden. Voer eerst het notebook uit.")
     st.stop()
 
+comparison = load_model_comparison()
+best_name = comparison.pop("_best_model", None)
 
-@st.cache_resource
-def _load_model():
-    return load_model()
+st.subheader("Classificatie-metrics (testset)")
+comp_df = pd.DataFrame(comparison).T.sort_values("roc_auc", ascending=False)
+comp_df.index.name = "Model"
 
+st.dataframe(
+    comp_df.style.format("{:.4f}")
+    .highlight_max(axis=0, color="#90EE90")
+    .highlight_min(axis=0, color="#FFB6B6"),
+    use_container_width=True,
+)
+if best_name:
+    st.success(f"Beste model (op ROC-AUC): **{best_name}**")
 
-@st.cache_data
-def _load_metrics():
-    return load_metrics()
+st.subheader("Vergelijking per metric")
+melted = comp_df.reset_index().melt(
+    id_vars="Model",
+    var_name="Metric",
+    value_name="Score",
+)
+fig = px.bar(
+    melted,
+    x="Metric",
+    y="Score",
+    color="Model",
+    barmode="group",
+    text_auto=".3f",
+)
+fig.update_layout(height=400, yaxis_range=[0, 1])
+st.plotly_chart(fig, use_container_width=True)
 
+st.subheader("Feature-importantie (beste model)")
 
-@st.cache_data
-def _load_unique_values():
-    df = pd.read_csv(RAW_CSV, on_bad_lines="skip")
-    return {
-        COL_LSV: sorted(df[COL_LSV].dropna().unique()),
-        COL_TERMINAL: sorted(df[COL_TERMINAL].dropna().unique()),
-        "gate_zone": sorted(
-            df[COL_GATE]
-            .str.extract(r"^([A-Z])", expand=False)
-            .dropna()
-            .unique()
-        ),
-        COL_AIRCRAFT: sorted(df[COL_AIRCRAFT].dropna().unique()),
-        COL_RUNWAY: sorted(df[COL_RUNWAY].dropna().unique()),
-        COL_RUNWAY_CONFIG: sorted(df[COL_RUNWAY_CONFIG].dropna().unique()),
-        COL_ORG_DES: sorted(df[COL_ORG_DES].dropna().unique()),
-        "carrier": sorted(
-            df[COL_FLIGHT]
-            .str.extract(r"^([A-Z]{2,3})", expand=False)
-            .dropna()
-            .unique()
-        ),
-    }
+LABELS = {
+    "hour": "Uur",
+    "minute": "Minuut",
+    "day_of_week": "Dag v/d week",
+    "month": "Maand",
+    "is_weekend": "Weekend",
+    "temperature_2m": "Temperatuur",
+    "wind_speed_10m": "Windsnelheid",
+    "wind_gusts_10m": "Windstoten",
+    "precipitation": "Neerslag",
+    "snowfall": "Sneeuwval",
+    "cloud_cover": "Bewolking",
+    "distance_km": "Afstand (km)",
+    "movements_per_hour": "Bewegingen/uur",
+    "carrier_enc": "Maatschappij",
+    "LSV_enc": "Aankomst/Vertrek",
+    "ACT_enc": "Vliegtuigtype",
+    "RWC_enc": "Baanconfiguratie",
+    "gate_zone_enc": "Gate-zone",
+}
 
+meta = load_feature_meta()
+clf = load_best_model().named_steps["clf"]
 
-model = _load_model()
-metrics = _load_metrics()
-uniques = _load_unique_values()
+if hasattr(clf, "feature_importances_"):
+    values = clf.feature_importances_
+    xlabel = "Importantie"
+else:
+    values = np.abs(clf.coef_[0])
+    xlabel = "|Coëfficiënt|"
 
-# -- Metrics ------------------------------------------------------------------
+imp = pd.Series(values, index=meta["feature_cols"]).sort_values()
+imp_df = imp.tail(12).reset_index()
+imp_df.columns = ["feature", "value"]
+imp_df["label"] = imp_df["feature"].map(LABELS).fillna(imp_df["feature"])
 
-st.subheader("Model performance (test set)")
-
-overall = metrics["overall"]
-c1, c2, c3 = st.columns(3)
-c1.metric("MAE (min)", f"{overall['mae']:.1f}")
-c2.metric("RMSE (min)", f"{overall['rmse']:.1f}")
-c3.metric("R²", f"{overall['r2']:.3f}")
-
-if "by_lsv" in metrics:
-    st.markdown("**By movement type**")
-    label_map = {"L": "Arrivals", "S": "Departures"}
-    lsv_cols = st.columns(len(metrics["by_lsv"]))
-    for col, (group, m) in zip(lsv_cols, metrics["by_lsv"].items()):
-        col.metric(f"{label_map.get(group, group)} MAE", f"{m['mae']:.1f} min")
-
-# -- Single-flight prediction -------------------------------------------------
-
-st.subheader("Predict delay for a single flight")
-
-with st.form("predict_form"):
-    r1c1, r1c2 = st.columns(2)
-    lsv = r1c1.selectbox(
-        "Arrival / Departure",
-        uniques[COL_LSV],
-        format_func=lambda x: "Arrival" if x == "L" else "Departure",
-    )
-    terminal = r1c2.selectbox("Terminal / Area", uniques[COL_TERMINAL])
-
-    r2c1, r2c2 = st.columns(2)
-    aircraft = r2c1.selectbox("Aircraft type", uniques[COL_AIRCRAFT])
-    gate_zone = r2c2.selectbox("Gate zone", uniques["gate_zone"])
-
-    r3c1, r3c2 = st.columns(2)
-    runway = r3c1.selectbox("Runway", uniques[COL_RUNWAY])
-    rw_config = r3c2.selectbox("Runway config", uniques[COL_RUNWAY_CONFIG])
-
-    r4c1, r4c2 = st.columns(2)
-    org_des = r4c1.selectbox(
-        "Origin / Destination (ICAO)", uniques[COL_ORG_DES]
-    )
-    carrier = r4c2.selectbox("Carrier", uniques["carrier"])
-
-    r5c1, r5c2 = st.columns(2)
-    sched_time = r5c1.time_input(
-        "Scheduled time", value=pd.Timestamp("08:00").time()
-    )
-    sched_date = r5c2.date_input("Scheduled date")
-
-    congestion = st.slider("Est. movements in ±30 min", 0, 80, 20)
-    submitted = st.form_submit_button("Predict")
-
-if submitted:
-    dow = pd.Timestamp(sched_date).dayofweek
-    row = pd.DataFrame(
-        [
-            {
-                COL_LSV: lsv,
-                COL_TERMINAL: terminal,
-                "gate_zone": gate_zone,
-                COL_AIRCRAFT: aircraft,
-                COL_RUNWAY: runway,
-                COL_RUNWAY_CONFIG: rw_config,
-                COL_ORG_DES: org_des,
-                "carrier": carrier,
-                "hour": sched_time.hour,
-                "minute": sched_time.minute,
-                "day_of_week": dow,
-                "month": sched_date.month,
-                "is_weekend": int(dow >= 5),
-                "moves_30m": congestion,
-                "moves_60m": int(congestion * 1.8),
-                "arr_30m": congestion // 2,
-                "dep_30m": congestion - congestion // 2,
-            }
-        ]
-    )
-    pred = predict(model, row)[0]
-    st.success(f"Predicted delay: **{pred:.1f} minutes**")
+fig_imp = go.Figure(
+    go.Bar(x=imp_df["value"], y=imp_df["label"], orientation="h")
+)
+fig_imp.update_layout(height=400, xaxis_title=xlabel, yaxis_title="")
+st.plotly_chart(fig_imp, use_container_width=True)

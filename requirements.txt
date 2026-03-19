@@ -5,3 +5,8 @@ scikit-learn
 numpy
 joblib
 plotly
+tqdm
+xgboost
+pydeck
+matplotlib
+seaborn

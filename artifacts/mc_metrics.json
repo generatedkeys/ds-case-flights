@@ -1,0 +1,13 @@
+{
+  "overall": {
+    "roc_auc_ovr": 0.6957,
+    "f1_macro": 0.4511,
+    "f1_weighted": 0.5522
+  },
+  "model_type": "gbr",
+  "labels": [
+    "on_time",
+    "minor_delay",
+    "major_delay"
+  ]
+}
