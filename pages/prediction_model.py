@@ -34,23 +34,6 @@ st.dataframe(
 if best_name:
     st.success(f"Beste model (op ROC-AUC): **{best_name}**")
 
-st.subheader("Vergelijking per metric")
-melted = comp_df.reset_index().melt(
-    id_vars="Model",
-    var_name="Metric",
-    value_name="Score",
-)
-fig = px.bar(
-    melted,
-    x="Metric",
-    y="Score",
-    color="Model",
-    barmode="group",
-    text_auto=".3f",
-)
-fig.update_layout(height=400, yaxis_range=[0, 1])
-st.plotly_chart(fig, use_container_width=True)
-
 st.subheader("Feature-importantie (beste model)")
 
 LABELS = {
