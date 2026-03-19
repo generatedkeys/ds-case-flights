@@ -19,6 +19,7 @@ if not MODEL_COMPARISON_PATH.exists():
 
 comparison = load_model_comparison()
 best_name = comparison.pop("_best_model", None)
+comparison.pop("_thresholds", None)
 
 st.subheader("Classificatie-metrics (testset)")
 comp_df = pd.DataFrame(comparison).T.sort_values("roc_auc", ascending=False)

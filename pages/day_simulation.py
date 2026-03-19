@@ -8,6 +8,7 @@ from src.config import PROCESSED_CSV, BEST_MODEL_PATH
 from src.predict import (
     load_best_model,
     load_feature_meta,
+    load_thresholds,
     build_feature_matrix,
     predict_delay_proba,
 )
@@ -41,6 +42,10 @@ if not BEST_MODEL_PATH.exists():
 
 model = _load_model()
 meta = _load_meta()
+_thresholds = load_thresholds()
+_best_threshold = _thresholds.get(
+    next((k for k in _thresholds if "gradient" in k.lower()), ""), 0.5
+)
 
 selected_date = st.date_input(
     "Kies een datum",
@@ -61,7 +66,7 @@ day_df["tijd"] = day_df["scheduled_dt"].dt.strftime("%H:%M")
 
 X_day = build_feature_matrix(day_df, meta)
 day_df["pred_proba"] = predict_delay_proba(model, X_day)
-day_df["pred_delayed"] = (day_df["pred_proba"] >= 0.5).astype(int)
+day_df["pred_delayed"] = (day_df["pred_proba"] >= _best_threshold).astype(int)
 day_df["correct"] = day_df["pred_delayed"] == day_df["is_delayed"]
 
 acc = accuracy_score(day_df["is_delayed"], day_df["pred_delayed"])

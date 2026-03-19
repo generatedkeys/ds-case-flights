@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from src.config import BEST_MODEL_PATH
-from src.predict import load_all_models, load_feature_meta
+from src.predict import load_all_models, load_feature_meta, load_thresholds
 
 st.title("Simulator")
 st.markdown("Pas parameters aan en bekijk de kans op vertraging >15 min.")
@@ -24,6 +24,7 @@ def _load_meta():
 
 models = _load_models()
 meta = _load_meta()
+thresholds = load_thresholds()
 le = meta["label_encoders"]
 
 selected_model = st.sidebar.selectbox("Model", list(models.keys()))
@@ -110,14 +111,15 @@ row = pd.DataFrame(
 
 st.divider()
 proba = model.predict_proba(row)[0, 1]
+t = thresholds.get(selected_model, 0.5)
 
 c1, c2 = st.columns(2)
-c1.metric("Voorspelling", "Vertraagd" if proba >= 0.5 else "Op tijd")
+c1.metric("Voorspelling", "Vertraagd" if proba >= t else "Op tijd")
 c2.metric("Kans op vertraging", f"{proba:.1%}")
 
-if proba >= 0.7:
+if proba >= t * 1.4:
     st.error(f"Hoog risico ({proba:.0%})")
-elif proba >= 0.5:
+elif proba >= t:
     st.warning(f"Matig risico ({proba:.0%})")
 else:
     st.success(f"Laag risico ({proba:.0%})")

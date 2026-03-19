@@ -39,6 +39,12 @@ def load_model_comparison() -> dict:
         return json.load(f)
 
 
+def load_thresholds() -> dict[str, float]:
+    """Return ``{model_name: threshold}`` from the comparison JSON."""
+    comp = load_model_comparison()
+    return comp.get("_thresholds", {})
+
+
 def load_feature_meta() -> dict:
     with open(FEATURE_COLUMNS_PATH) as f:
         return json.load(f)
@@ -69,5 +75,8 @@ def predict_delay_proba(model: Pipeline, X: pd.DataFrame) -> np.ndarray:
     return model.predict_proba(X)[:, 1]
 
 
-def predict_delay_class(model: Pipeline, X: pd.DataFrame) -> np.ndarray:
-    return model.predict(X)
+def predict_delay_class(
+    model: Pipeline, X: pd.DataFrame, threshold: float = 0.5
+) -> np.ndarray:
+    proba = model.predict_proba(X)[:, 1]
+    return (proba >= threshold).astype(int)
