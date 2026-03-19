@@ -130,9 +130,20 @@ st.pydeck_chart(
         },
     )
 )
-st.caption(
-    f"{len(arc_data)} bestemmingen. "
-    "Kleur: blauw -> rood = laag -> hoog vertragingspercentage."
+low_pct = f"{vmin * 100:.0f}%"
+high_pct = f"{vmax * 100:.0f}%"
+st.markdown(
+    f"""
+    <div style="display:flex; align-items:center; gap:8px; margin:4px 0 8px;">
+        <span style="font-size:0.85em;">{low_pct}</span>
+        <div style="height:12px; width:200px; border-radius:4px;
+             background:linear-gradient(to right, rgb(0,200,255), rgb(255,30,30));"></div>
+        <span style="font-size:0.85em;">{high_pct}</span>
+        <span style="font-size:0.8em; color:gray; margin-left:4px;">vertragingspercentage</span>
+    </div>
+    <div style="font-size:0.8em; color:gray;">{len(arc_data)} bestemmingen</div>
+    """,
+    unsafe_allow_html=True,
 )
 
 st.subheader("Maandelijks vluchtvolume")
