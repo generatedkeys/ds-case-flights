@@ -20,7 +20,7 @@ st.markdown(
 
 
 @st.cache_data
-def load_data():
+def load_data() -> pd.DataFrame:
     return pd.read_csv(PROCESSED_CSV, parse_dates=["date", "scheduled_dt"])
 
 
@@ -30,7 +30,7 @@ def _load_model():
 
 
 @st.cache_data
-def _load_meta():
+def _load_meta() -> dict:
     return load_feature_meta()
 
 
@@ -87,7 +87,7 @@ window_df = day_df[
 ]
 
 
-def _delay_cat(m):
+def _delay_cat(m: int | float) -> str:
     if m <= 0:
         return "Op tijd / vroeg"
     if m <= 15:
@@ -206,7 +206,7 @@ tbl.columns = [
 tbl["Type"] = tbl["Type"].map({"L": "Aankomst", "S": "Vertrek"})
 
 
-def _color(val):
+def _color(val: bool | None) -> str:
     if val is True:
         return "background-color: rgba(46,204,113,0.15)"
     if val is False:
@@ -215,7 +215,7 @@ def _color(val):
 
 
 st.dataframe(
-    tbl.style.applymap(_color, subset=["Correct"]),
+    tbl.style.map(_color, subset=["Correct"]),
     width='stretch',
     height=400,
 )
