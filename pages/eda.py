@@ -88,10 +88,11 @@ min_flights = st.slider("Minimum vluchten per route", 10, 500, 50, step=10)
 arc_data = route_stats[route_stats["vluchten"] >= min_flights].copy()
 arc_data["src_lat"], arc_data["src_lon"] = ZRH_LAT, ZRH_LON
 
-thresh = arc_data["vertr_perc"].quantile(0.75)
-arc_data["r"] = np.where(arc_data["vertr_perc"] > thresh, 220, 50)
-arc_data["g"] = np.where(arc_data["vertr_perc"] > thresh, 60, 130)
-arc_data["b"] = np.where(arc_data["vertr_perc"] > thresh, 60, 200)
+vmin, vmax = arc_data["vertr_perc"].min(), arc_data["vertr_perc"].max()
+norm = (arc_data["vertr_perc"] - vmin) / max(vmax - vmin, 1e-9)
+arc_data["r"] = (norm * 255 + (1 - norm) * 0).astype(int)
+arc_data["g"] = ((1 - norm) * 200 + norm * 30).astype(int)
+arc_data["b"] = ((1 - norm) * 255 + norm * 30).astype(int)
 
 st.pydeck_chart(
     pdk.Deck(
@@ -101,8 +102,8 @@ st.pydeck_chart(
                 data=arc_data,
                 get_source_position=["src_lon", "src_lat"],
                 get_target_position=["Longitude", "Latitude"],
-                get_source_color=[50, 130, 200, 160],
-                get_target_color=["r", "g", "b", 180],
+                get_source_color=["r", "g", "b", 200],
+                get_target_color=["r", "g", "b", 240],
                 get_width=2,
                 pickable=True,
                 auto_highlight=True,
@@ -113,7 +114,7 @@ st.pydeck_chart(
                 get_position=["Longitude", "Latitude"],
                 get_radius="vluchten",
                 radius_scale=20,
-                get_fill_color=["r", "g", "b", 200],
+                get_fill_color=["r", "g", "b", 240],
                 pickable=True,
             ),
         ],
@@ -131,7 +132,7 @@ st.pydeck_chart(
 )
 st.caption(
     f"{len(arc_data)} bestemmingen. "
-    "Rode bogen = top-25% vertragingspercentage."
+    "Kleur: blauw -> rood = laag -> hoog vertragingspercentage."
 )
 
 st.subheader("Maandelijks vluchtvolume")
