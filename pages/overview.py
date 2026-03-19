@@ -1,16 +1,14 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import pydeck as pdk
 
 from src.config import PROCESSED_CSV, AIRPORTS_CSV, ZRH_LAT, ZRH_LON
 
 @st.cache_data
-def load_data():
+def load_data() -> pd.DataFrame:
     return pd.read_csv(PROCESSED_CSV, parse_dates=["date", "scheduled_dt"])
 
 @st.cache_data
-def load_airports():
+def load_airports() -> pd.DataFrame:
     a = pd.read_csv(AIRPORTS_CSV, sep=";")
     for col in ("Latitude", "Longitude"):
         a[col] = a[col].astype(str).str.replace(",", ".").astype(float)

@@ -13,12 +13,12 @@ if not BEST_MODEL_PATH.exists():
 
 
 @st.cache_resource
-def _load_models():
+def _load_models() -> dict:
     return load_all_models()
 
 
 @st.cache_data
-def _load_meta():
+def _load_meta() -> dict:
     return load_feature_meta()
 
 
@@ -79,7 +79,7 @@ distance = st.sidebar.slider("Afstand (km)", 100, 12000, 1000, step=100)
 congestion = st.sidebar.slider("Bewegingen/uur", 5, 80, 30)
 
 
-def _enc(col, val):
+def _enc(col: str, val: str) -> int:
     classes = le[col]
     return classes.index(val) if val in classes else 0
 
