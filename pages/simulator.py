@@ -133,5 +133,5 @@ st.dataframe(
     p_df.style.format("{:.1%}").bar(
         subset=["Kans op vertraging"], color="#ff6b6b", vmin=0, vmax=1
     ),
-    use_container_width=True,
+    width='stretch',
 )

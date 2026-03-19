@@ -115,5 +115,5 @@ monthly = (
     .reset_index(name="vluchten")
 )
 monthly["date"] = monthly["date"].dt.to_timestamp()
-st.line_chart(monthly.set_index("date")["vluchten"], use_container_width=True)
+st.line_chart(monthly.set_index("date")["vluchten"], width='stretch')
 st.caption("De impact van COVID-19 is duidelijk zichtbaar vanaf maart 2020.")

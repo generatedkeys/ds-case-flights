@@ -29,7 +29,7 @@ st.dataframe(
     comp_df.style.format("{:.4f}")
     .highlight_max(axis=0, color="#90EE90")
     .highlight_min(axis=0, color="#FFB6B6"),
-    use_container_width=True,
+    width='stretch',
 )
 if best_name:
     st.success(f"Beste model (op ROC-AUC): **{best_name}**")
@@ -76,4 +76,4 @@ fig_imp = go.Figure(
     go.Bar(x=imp_df["value"], y=imp_df["label"], orientation="h")
 )
 fig_imp.update_layout(height=400, xaxis_title=xlabel, yaxis_title="")
-st.plotly_chart(fig_imp, use_container_width=True)
+st.plotly_chart(fig_imp, width='stretch')

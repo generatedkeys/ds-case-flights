@@ -141,7 +141,7 @@ fig.add_hline(
     annotation_text="15 min grens",
 )
 fig.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.3)
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
 st.subheader("Werkelijk vs. voorspeld per uur")
 hourly = (
@@ -176,7 +176,7 @@ fig2.update_layout(
     xaxis=dict(title="Uur", dtick=1),
     yaxis_title="Vertraagde vluchten",
 )
-st.plotly_chart(fig2, use_container_width=True)
+st.plotly_chart(fig2, width='stretch')
 
 st.subheader("Vluchten")
 tbl = window_df[
@@ -216,6 +216,6 @@ def _color(val):
 
 st.dataframe(
     tbl.style.applymap(_color, subset=["Correct"]),
-    use_container_width=True,
+    width='stretch',
     height=400,
 )
